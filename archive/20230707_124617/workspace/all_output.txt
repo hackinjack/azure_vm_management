@@ -1,0 +1,111 @@
+Based on the requirements, here are the core classes, functions, and methods that will be necessary:
+
+1. AzureClient: A class responsible for authenticating with Azure using a service principal and performing operations on Azure resources.
+   - authenticate(): Authenticates with Azure using the service principal and secret.
+   - get_virtual_machines(): Retrieves a list of virtual machines in the specified subscription.
+   - update_vm_tags(): Updates the tags of a virtual machine.
+
+2. VMTagUpdater: A class responsible for checking and updating the tags of virtual machines.
+   - check_tags(): Checks if the "PMEnabled" and "PMEnabledDaily" tags exist and have a value of "null" for a given virtual machine.
+   - update_tags(): Updates the "PMEnabled" and "PMEnabledDaily" tags to "true" for a given virtual machine.
+
+Now, let's proceed with creating the necessary files and their content.
+
+1. azure_client.py
+
+```python
+from azure.identity import ClientSecretCredential
+from azure.mgmt.compute import ComputeManagementClient
+from azure.mgmt.resource import ResourceManagementClient
+
+class AzureClient:
+    def __init__(self, tenant_id, client_id, client_secret, subscription_id):
+        self.tenant_id = tenant_id
+        self.client_id = client_id
+        self.client_secret = client_secret
+        self.subscription_id = subscription_id
+        self.compute_client = None
+        self.resource_client = None
+
+    def authenticate(self):
+        credentials = ClientSecretCredential(
+            tenant_id=self.tenant_id,
+            client_id=self.client_id,
+            client_secret=self.client_secret
+        )
+        self.compute_client = ComputeManagementClient(credentials, self.subscription_id)
+        self.resource_client = ResourceManagementClient(credentials, self.subscription_id)
+
+    def get_virtual_machines(self):
+        vm_list = self.compute_client.virtual_machines.list_all()
+        return [vm for vm in vm_list]
+
+    def update_vm_tags(self, resource_group_name, vm_name, tags):
+        self.resource_client.tags.update_at_scope(
+            scope=f"/subscriptions/{self.subscription_id}/resourceGroups/{resource_group_name}/providers/Microsoft.Compute/virtualMachines/{vm_name}",
+            tags=tags
+        )
+```
+
+2. vm_tag_updater.py
+
+```python
+class VMTagUpdater:
+    def __init__(self, azure_client):
+        self.azure_client = azure_client
+
+    def check_tags(self, vm):
+        tags = vm.tags
+        if tags and "PMEnabled" in tags and "PMEnabledDaily" in tags:
+            pm_enabled = tags.get("PMEnabled")
+            pm_enabled_daily = tags.get("PMEnabledDaily")
+            if pm_enabled == "null" or pm_enabled_daily == "null":
+                return True
+        return False
+
+    def update_tags(self, vm):
+        resource_group_name = vm.id.split("/")[4]
+        vm_name = vm.name
+        tags = {
+            "PMEnabled": "true",
+            "PMEnabledDaily": "true"
+        }
+        self.azure_client.update_vm_tags(resource_group_name, vm_name, tags)
+```
+
+3. main.py (entrypoint)
+
+```python
+from azure_client import AzureClient
+from vm_tag_updater import VMTagUpdater
+
+# Azure authentication details
+tenant_id = "YOUR_TENANT_ID"
+client_id = "YOUR_CLIENT_ID"
+client_secret = "YOUR_CLIENT_SECRET"
+subscription_id = "YOUR_SUBSCRIPTION_ID"
+
+# Create Azure client and authenticate
+azure_client = AzureClient(tenant_id, client_id, client_secret, subscription_id)
+azure_client.authenticate()
+
+# Create VMTagUpdater instance
+vm_tag_updater = VMTagUpdater(azure_client)
+
+# Get list of virtual machines
+vms = azure_client.get_virtual_machines()
+
+# Check and update tags for each virtual machine
+for vm in vms:
+    if vm_tag_updater.check_tags(vm):
+        vm_tag_updater.update_tags(vm)
+```
+
+Please note that you need to replace the placeholders (YOUR_TENANT_ID, YOUR_CLIENT_ID, YOUR_CLIENT_SECRET, YOUR_SUBSCRIPTION_ID) with your actual Azure authentication details.
+
+This architecture consists of three files:
+- azure_client.py: Contains the AzureClient class responsible for authenticating with Azure and performing operations on Azure resources.
+- vm_tag_updater.py: Contains the VMTagUpdater class responsible for checking and updating the tags of virtual machines.
+- main.py: The entrypoint file that creates instances of AzureClient and VMTagUpdater, retrieves the list of virtual machines, and updates the tags if necessary.
+
+Make sure to install the necessary Azure SDK packages by running `pip install azure-identity azure-mgmt-compute azure-mgmt-resource` and provide the appropriate versions in the requirements.txt file.

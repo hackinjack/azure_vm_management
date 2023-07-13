@@ -1,0 +1,23 @@
+from azure_client import AzureClient
+from vm_tag_updater import VMTagUpdater
+
+# Azure authentication details
+tenant_id = "YOUR_TENANT_ID"
+client_id = "YOUR_CLIENT_ID"
+client_secret = "YOUR_CLIENT_SECRET"
+subscription_id = "YOUR_SUBSCRIPTION_ID"
+
+# Create Azure client and authenticate
+azure_client = AzureClient(tenant_id, client_id, client_secret, subscription_id)
+azure_client.authenticate()
+
+# Create VMTagUpdater instance
+vm_tag_updater = VMTagUpdater(azure_client)
+
+# Get list of virtual machines
+vms = azure_client.get_virtual_machines()
+
+# Check and update tags for each virtual machine
+for vm in vms:
+    if vm_tag_updater.check_tags(vm):
+        vm_tag_updater.update_tags(vm)

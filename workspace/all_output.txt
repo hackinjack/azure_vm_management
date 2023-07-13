@@ -1,0 +1,127 @@
+The core classes, functions, and methods that will be necessary for this tool are:
+
+1. AzureAuthenticator: A class responsible for authenticating the Python tool with the Azure service principal and secret.
+2. AzureVMManager: A class responsible for managing Azure VMs, including retrieving the list of VMs, checking and updating tags.
+3. Logger: A class responsible for logging the changes made to the tags in a logfile.
+4. ErrorHandler: A class responsible for handling potential errors or exceptions that may occur during the process.
+
+Now let's proceed with the file contents.
+
+**azure_authenticator.py**
+```python
+import os
+from azure.identity import ClientSecretCredential
+
+class AzureAuthenticator:
+    def __init__(self):
+        self.client_id = os.environ.get('AZURE_CLIENT_ID')
+        self.client_secret = os.environ.get('AZURE_CLIENT_SECRET')
+        self.tenant_id = os.environ.get('AZURE_TENANT_ID')
+
+    def authenticate(self):
+        credential = ClientSecretCredential(
+            client_id=self.client_id,
+            client_secret=self.client_secret,
+            tenant_id=self.tenant_id
+        )
+        return credential
+```
+
+**azure_vm_manager.py**
+```python
+from azure.mgmt.compute import ComputeManagementClient
+from azure.core.exceptions import HttpResponseError
+
+class AzureVMManager:
+    def __init__(self, subscription_id):
+        self.subscription_id = subscription_id
+        self.compute_client = ComputeManagementClient(
+            credential=None, subscription_id=self.subscription_id
+        )
+
+    def get_vm_list(self):
+        try:
+            vm_list = self.compute_client.virtual_machines.list_all()
+            return vm_list
+        except HttpResponseError as e:
+            raise Exception(f"Failed to retrieve VM list: {e}")
+
+    def check_tags(self, vm):
+        if vm.tags is not None and "PMEnabled" in vm.tags and "PMEnabledDaily" in vm.tags:
+            return True
+        return False
+
+    def update_tags(self, vm):
+        try:
+            if vm.tags["PMEnabled"] == "null":
+                vm.tags["PMEnabled"] = "true"
+            if vm.tags["PMEnabledDaily"] == "null":
+                vm.tags["PMEnabledDaily"] = "true"
+            self.compute_client.virtual_machines.create_or_update(
+                vm.resource_group, vm.name, vm
+            )
+        except HttpResponseError as e:
+            raise Exception(f"Failed to update tags for VM {vm.name}: {e}")
+```
+
+**logger.py**
+```python
+import logging
+
+class Logger:
+    def __init__(self, log_file):
+        self.log_file = log_file
+
+    def log_changes(self, vm_name, tags):
+        logging.basicConfig(filename=self.log_file, level=logging.INFO)
+        logging.info(f"Tags updated for VM {vm_name}: {tags}")
+```
+
+**error_handler.py**
+```python
+class ErrorHandler:
+    def handle_error(self, error_message):
+        # Handle the error based on the requirements
+        pass
+```
+
+**main.py**
+```python
+from azure_authenticator import AzureAuthenticator
+from azure_vm_manager import AzureVMManager
+from logger import Logger
+from error_handler import ErrorHandler
+
+def main():
+    # Initialize AzureAuthenticator
+    authenticator = AzureAuthenticator()
+    credential = authenticator.authenticate()
+
+    # Initialize AzureVMManager
+    subscription_id = "<your_subscription_id>"
+    vm_manager = AzureVMManager(subscription_id)
+
+    # Retrieve VM list
+    vm_list = vm_manager.get_vm_list()
+
+    # Initialize Logger
+    log_file = "tag_changes.log"
+    logger = Logger(log_file)
+
+    # Initialize ErrorHandler
+    error_handler = ErrorHandler()
+
+    # Process VMs
+    for vm in vm_list:
+        try:
+            if vm_manager.check_tags(vm):
+                vm_manager.update_tags(vm)
+                logger.log_changes(vm.name, vm.tags)
+        except Exception as e:
+            error_handler.handle_error(str(e))
+
+if __name__ == "__main__":
+    main()
+```
+
+Please note that the code provided is a basic implementation and may require additional error handling, input validation, and customization based on your specific requirements.

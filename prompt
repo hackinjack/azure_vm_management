@@ -1,0 +1,10 @@
+We are creating a python tool to generate a list of azure VMs in a given subscription, check which of them has tags "PMEnabled" and "PMEnabledDaily" and if they have value "null", set them to "true"
+The service principal has sufficient privileges to perform these actions.
+we are authenticating the Python tool with the Azure service principal and secret
+we are not using the Azure SDK for Python to interact with the Azure resources
+the tool should consider VMs across all resource groups in the subscription
+the tool should also check for the existence of the "PMEnabled" and "PMEnabledDaily" tags before setting their values
+the tool should update the tags on the VMs through a separate API call
+the tool should log the changes made to the tags in a logfile
+the tool should handle any potential errors or exceptions that may occur during the process
+
